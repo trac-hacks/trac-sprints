@@ -1,0 +1,5 @@
+This plugin is designed as a sprint report viewer
+
+Currently it installs and accepts the /sprints request and prints out a template file.
+
+More coming soon..
