@@ -19,8 +19,7 @@ class TracSprints(Component):
     #key = Option('github', 'apitoken', '', doc="""Your GitHub API Token found here: https://github.com/account, """)
 
     def __init__(self):
-        pass
- 
+        self.db = self.env.get_db_cnx()
 
    
     # IRequestHandler methods
@@ -29,13 +28,37 @@ class TracSprints(Component):
         serve = req.path_info.rstrip('/') == '/sprints'
         self.env.log.debug("Handle Request: %s" % serve)
         return serve
+ 
+    def get_milestones(self):
+        cursor = self.db.cursor()
+        sql = "select name from milestone where (completed = 0)"
+        cursor.execute(sql)
+        self.env.log.debug("sql: %s" % sql)
+        m = []
+        for name in cursor: 
+            self.env.log.debug("name: %s" % name)
+            m.append(name)
+        
+        return m
     
+    def get_users(self):
+        devs = self.env.get_known_users()
+        odevs = []
+        for username,name,email in devs:
+            data = {
+                'username': username,
+                'name': name,
+                'email': email
+            }
+            odevs.append(data)
+        self.env.log.debug("devs: %s" % odevs)
+        return odevs
+
     def process_request(self, req):
-        #req.send_response(200)
-        #req.send_header('Content-Type', 'text/plain')
-        #req.end_headers()
-        #req.write('Hello world!')
         data = {}
+        data['milestones'] = self.get_milestones()
+        data['devs'] = self.get_users()
+
         add_script(req, "tracsprints/tracsprints.js")
         add_stylesheet(req, "tracsprints/tracsprints.css")
         return 'sprints.html', data, None

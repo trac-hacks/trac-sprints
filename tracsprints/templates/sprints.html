@@ -16,6 +16,22 @@
     </script>
 </head>
 <body>
-<h2>Dav was here</h2>
+<h1>Dav was here</h1>
+
+<h2>Milestones</h2>
+<ul>
+    <py:for each="stone in milestones">
+        <li>$stone</li>
+    </py:for>
+</ul>
+
+<h2>Users</h2>
+<ul>
+    <py:for each="dev in devs">
+        <li>$dev.username</li>
+    </py:for>
+</ul>
+
+
 </body>
 </html>    
