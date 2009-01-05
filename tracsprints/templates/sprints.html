@@ -32,6 +32,16 @@
     </py:for>
 </ul>
 
-
+<h2>Totals</h2>
+<ul>
+    <py:for each="total in totals">
+        <li>$total.status ($total.count) : ($total.percent)</li>
+    </py:for>
+</ul>
+<div style="width: 110px; height: 25px; position: relative;">
+    <py:for each="total in totals">
+        <div style="width: ${total.percent}px; height: 25px; border: 1px solid black; float: left; background-color: ${total.color}"></div>
+    </py:for>
+</div>
 </body>
 </html>    

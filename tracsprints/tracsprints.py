@@ -25,7 +25,7 @@ class TracSprints(Component):
     # IRequestHandler methods
     def match_request(self, req):
         self.env.log.debug("Match Request")
-        serve = req.path_info.rstrip('/') == '/sprints'
+        serve = req.path_info.rstrip('/') == '/burndown'
         self.env.log.debug("Handle Request: %s" % serve)
         return serve
  
@@ -54,10 +54,44 @@ class TracSprints(Component):
         self.env.log.debug("devs: %s" % odevs)
         return odevs
 
+    def get_totals(self):
+        cursor = self.db.cursor()
+        sql = 'select status, count(*) as ncount from ticket where (milestone = "one") group by status'
+        cursor.execute(sql)
+        data = []
+        c = 0
+        colors = ['red', 'green', 'orange', 'yellow', 'purple']
+        for status, count in cursor:
+            n = {
+                'status': status,
+                'count': count,
+                'percent': 0,
+                'color': colors[c]
+            }
+            data.append(n)
+            c = c + 1
+        return data
+
+
     def process_request(self, req):
         data = {}
         data['milestones'] = self.get_milestones()
         data['devs'] = self.get_users()
+        data['totals'] = self.get_totals()
+        
+        total = 0
+        for i in data['totals']:
+            total += i['count']
+
+        total = float(total)
+
+        for i in data['totals']:
+            i['percent'] = (round((float(i['count']) / total), 3) * 100)
+        
+
+        data['percents'] = {
+            'total': total
+        }
 
         add_script(req, "tracsprints/tracsprints.js")
         add_stylesheet(req, "tracsprints/tracsprints.css")
