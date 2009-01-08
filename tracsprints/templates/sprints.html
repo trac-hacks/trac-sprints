@@ -16,32 +16,65 @@
     </script>
 </head>
 <body>
-<h1>Dav was here</h1>
+<h1>Sprint Burndown</h1>
 
-<h2>Milestones</h2>
-<ul>
-    <py:for each="stone in milestones">
-        <li>$stone</li>
-    </py:for>
-</ul>
+<div py:if="milestones">
+    <h2>Milestones</h2>
+    <p>Pick from the available milestones:</p>
+    <ul>
+        <py:for each="stone in milestones">
+            <li><a href="?milestone=${stone.name}">$stone.name ($stone.count)</a></li>
+        </py:for>
+    </ul>
 
-<h2>Users</h2>
-<ul>
-    <py:for each="dev in devs">
-        <li>$dev.username</li>
-    </py:for>
-</ul>
+</div>
 
-<h2>Totals</h2>
-<ul>
-    <py:for each="total in totals">
-        <li>$total.status ($total.count) : ($total.percent)</li>
-    </py:for>
-</ul>
-<div style="width: 110px; height: 25px; position: relative;">
-    <py:for each="total in totals">
-        <div style="width: ${total.percent}px; height: 25px; border: 1px solid black; float: left; background-color: ${total.color}"></div>
-    </py:for>
+
+<div py:if="devs" class="sprints">
+    <a href="burndown">Back</a>
+    <h2>Showing Milestone: $title</h2>
+    <div py:if="noWork">
+        <p><strong><em>There are no valid tickets open for this milestone.</em></strong></p>
+    </div>
+    <div py:if="hasWork">
+
+        <h2>Milestone Total</h2>
+        <div class="bar-wrapper" style="width: ${barWidth}px">
+            <py:for each="tot in totals">
+                <div class="bar-item" style="background-color: ${tot.color}; width: ${tot.width}%;"></div>
+            </py:for>
+        </div>
+        <ul>
+            <py:for each="tot in totals">
+                <li><span class="legend" style="background-color: ${tot.color};"></span><a href="query?status=${tot.status}&amp;milestone=${title}">${tot.status} (${tot.count})</a></li>
+            </py:for>
+        </ul>
+        <div>
+            <py:for each="devtot in dev_totals">
+                <h3>$devtot.username</h3>
+                <div class="bar-wrapper" style="width: ${barWidth}px">
+                    <py:for each="dtot in devtot.totals">
+                        <div class="bar-item" style="background-color: ${dtot.color}; width: ${dtot.width}%;"></div>
+                    </py:for>
+                </div>
+                <ul>
+                    <py:for each="dtot in devtot.totals">
+                        <li><span class="legend" style="background-color: ${dtot.color};"></span><a href="query?status=${dtot.status}&amp;owner=${devtot.username}&amp;milestone=${title}">${dtot.status} (${dtot.count})</a></li>
+                    </py:for>
+                </ul>
+            </py:for>
+        </div>
+
+
+        <!--div class="yui-gb">
+            <div class="yui-u first">
+            </div>
+            <div class="yui-u">
+            </div>
+            <div class="yui-u">
+            </div>
+        </div-->
+    </div>
 </div>
 </body>
 </html>    

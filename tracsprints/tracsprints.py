@@ -16,10 +16,14 @@ from trac.web.api import ITemplateStreamFilter
 class TracSprints(Component):
     implements(IRequestHandler, ITemplateProvider)
     
-    #key = Option('github', 'apitoken', '', doc="""Your GitHub API Token found here: https://github.com/account, """)
+    #key = Option('github', 'apitoken', '', doc=""" """)
 
     def __init__(self):
         self.db = self.env.get_db_cnx()
+        self.defaultOrder = ['closed', 'accepted', 'assigned', 'new', 'reopened']
+        self.colors = ['green', 'yellow', 'orange', 'red', 'purple']
+        self.scaleFactor = 3
+        self.currentMilestone = False
 
    
     # IRequestHandler methods
@@ -27,6 +31,13 @@ class TracSprints(Component):
         self.env.log.debug("Match Request")
         serve = req.path_info.rstrip('/') == '/burndown'
         self.env.log.debug("Handle Request: %s" % serve)
+        if req.args.get('milestone'):
+            cursor = self.db.cursor()
+            sql = "select name from milestone where (name = '%s')" % req.args.get('milestone')
+            cursor.execute(sql)
+            for name in cursor:
+                self.currentMilestone = req.args.get('milestone')
+
         return serve
  
     def get_milestones(self):
@@ -35,10 +46,20 @@ class TracSprints(Component):
         cursor.execute(sql)
         self.env.log.debug("sql: %s" % sql)
         m = []
-        for name in cursor: 
+        for name in cursor:
             self.env.log.debug("name: %s" % name)
-            m.append(name)
+            n = {
+                'name': name,
+                'count': 0
+            }
+            m.append(n)
         
+        for item in m:
+            sql = "select count(*) as nCount from ticket where (milestone = '%s')" % item['name']
+            cursor.execute(sql)
+            for count in cursor:
+                item['count'] = count
+
         return m
     
     def get_users(self):
@@ -54,44 +75,120 @@ class TracSprints(Component):
         self.env.log.debug("devs: %s" % odevs)
         return odevs
 
-    def get_totals(self):
-        cursor = self.db.cursor()
-        sql = 'select status, count(*) as ncount from ticket where (milestone = "one") group by status'
-        cursor.execute(sql)
+    def get_dev_totals(self):
+        users = self.get_users()
         data = []
+        for u in users:
+            tot = self.get_ordered_totals(u['username'])
+            u['totals'] = tot
+            data.append(u)
+
+        return data
+
+    def get_totals(self, user=None):
+        cursor = self.db.cursor()
+        if not user == None:
+            sql = 'select status, count(*) as ncount from ticket where (milestone = "%s") and (owner = "%s") group by status' % (self.currentMilestone, user)
+        else:
+            sql = 'select status, count(*) as ncount from ticket where (milestone = "%s") group by status' % self.currentMilestone
+        cursor.execute(sql)
+        data = {}
         c = 0
-        colors = ['red', 'green', 'orange', 'yellow', 'purple']
         for status, count in cursor:
-            n = {
+            data[status] = {
                 'status': status,
                 'count': count,
                 'percent': 0,
-                'color': colors[c]
+                'width': 0
             }
-            data.append(n)
             c = c + 1
         return data
 
+    def get_ordered_totals(self, user=None):
+        data = self.get_totals(user)
+        ordered = []
+
+        for k in self.defaultOrder:
+            try:
+                ordered.append(data[k])
+            except KeyError:
+                n = {}
+                n[k] = {
+                    'status': k,
+                    'count': 0,
+                    'percent': 0,
+                    'width': 0
+                }
+                ordered.append(n[k])
+
+        c = 0
+        total = 0
+        for d in ordered:
+            total += d['count']
+            d['color'] = self.colors[c]
+            c = c + 1
+
+        total = float(total)
+        
+        if not user == None:
+            width = 0
+            for i in ordered:
+                try:
+                    i['percent'] = (round((float(i['count']) / total), 3) * 100)
+                    i['width'] = round(i['percent'])
+                except ZeroDivisionError:
+                    i['percent'] = 1
+                    i['width'] = round(i['percent'])
+
+                if i['percent'] == 0:
+                    i['percent'] = 1
+                    i['width'] = 1
+
+                width = width + i['width']
+                if width > 100:
+                    diff = width - 100
+                    i['width'] = i['width'] - diff
+
+        return ordered
 
     def process_request(self, req):
         data = {}
-        data['milestones'] = self.get_milestones()
-        data['devs'] = self.get_users()
-        data['totals'] = self.get_totals()
-        
-        total = 0
-        for i in data['totals']:
-            total += i['count']
+        if self.currentMilestone == False:
+            data['milestones'] = self.get_milestones()
+        else:
+            data['title'] = self.currentMilestone
+            data['devs'] = self.get_users()
+            data['dev_totals'] = self.get_dev_totals()
+            data['totals'] = self.get_ordered_totals()
+            self.env.log.debug("defaultOrder: %s" % data['totals'])
+            
+            total = 0
+            for i in data['totals']:
+                total += i['count']
 
-        total = float(total)
+            total = float(total)
 
-        for i in data['totals']:
-            i['percent'] = (round((float(i['count']) / total), 3) * 100)
-        
+            if total > 0:
+                data['hasWork'] = True
+            else:
+                data['noWork'] = True
+            
+            width = 0
+            for i in data['totals']:
+                try:
+                    i['percent'] = (round((float(i['count']) / total), 3) * 100)
+                    i['width'] = round(i['percent'])
+                except ZeroDivisionError:
+                    i['percent'] = 1
+                    i['width'] = round(i['percent'])
 
-        data['percents'] = {
-            'total': total
-        }
+                width = width + i['width']
+                if width > 100:
+                    diff = width - 100
+                    i['width'] = i['width'] - diff
+
+            data['barWidth'] = self.scaleFactor * 100           
+
 
         add_script(req, "tracsprints/tracsprints.js")
         add_stylesheet(req, "tracsprints/tracsprints.css")
