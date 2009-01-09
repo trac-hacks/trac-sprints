@@ -80,8 +80,13 @@ class TracSprints(Component):
         data = []
         for u in users:
             tot = self.get_ordered_totals(u['username'])
-            u['totals'] = tot
-            data.append(u)
+            count = 0
+            for i in tot:
+                count = count + i['count']
+
+            if count > 0:
+                u['totals'] = tot
+                data.append(u)
 
         return data
 
