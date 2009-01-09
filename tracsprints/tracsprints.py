@@ -10,13 +10,17 @@ from trac.util.datefmt import utc, to_timestamp
 from genshi.template import TemplateLoader
 from genshi.filters.transform import Transformer
 from trac.web.api import ITemplateStreamFilter
+from trac.perm import IPermissionRequestor
+
 
 
 
 class TracSprints(Component):
-    implements(IRequestHandler, ITemplateProvider)
+    implements(IRequestHandler, ITemplateProvider, IPermissionRequestor)
     
     #key = Option('github', 'apitoken', '', doc=""" """)
+    permission = ListOption('tracsprints', 'permission', '')
+    
 
     def __init__(self):
         self.db = self.env.get_db_cnx()
@@ -24,6 +28,16 @@ class TracSprints(Component):
         self.colors = ['green', 'yellow', 'orange', 'red', 'purple']
         self.scaleFactor = 3
         self.currentMilestone = False
+        self.perm = self.config.get('tracsprints', 'permission', '').upper()
+        
+        if not self.perm:
+            self.perm = 'ROADMAP_VIEW'
+
+        self.env.log.debug("Using Permission: %s" % self.perm)
+
+
+    def get_permission_actions(self):
+        yield self.perm
 
    
     # IRequestHandler methods
@@ -31,6 +45,10 @@ class TracSprints(Component):
         self.env.log.debug("Match Request")
         serve = req.path_info.rstrip('/') == '/burndown'
         self.env.log.debug("Handle Request: %s" % serve)
+        if not self.perm in req.perm:
+            self.env.log.debug("NO Permission IV")
+            return False
+
         if req.args.get('milestone'):
             cursor = self.db.cursor()
             sql = "select name from milestone where (name = '%s')" % req.args.get('milestone')
@@ -72,7 +90,7 @@ class TracSprints(Component):
                 'email': email
             }
             odevs.append(data)
-        self.env.log.debug("devs: %s" % odevs)
+        #self.env.log.debug("devs: %s" % odevs)
         return odevs
 
     def get_dev_totals(self):
