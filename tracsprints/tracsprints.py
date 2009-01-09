@@ -42,19 +42,41 @@ class TracSprints(Component):
    
     # IRequestHandler methods
     def match_request(self, req):
+        serve = False
+        self.currentMilestone = False
         self.env.log.debug("Match Request")
-        serve = req.path_info.rstrip('/') == '/burndown'
+
+
+        uri = req.path_info.lstrip('/').split('/')
+        if uri[0] == 'burndown':
+            serve = True
+
         self.env.log.debug("Handle Request: %s" % serve)
+        self.baseURL = req.href('burndown', '/')
+        self.baseQueryURL = req.href('query', '/')
         if not self.perm in req.perm:
-            self.env.log.debug("NO Permission IV")
+            self.env.log.debug("NO Permission to view")
             return False
 
-        if req.args.get('milestone'):
-            cursor = self.db.cursor()
-            sql = "select name from milestone where (name = '%s')" % req.args.get('milestone')
-            cursor.execute(sql)
-            for name in cursor:
-                self.currentMilestone = req.args.get('milestone')
+        
+        try:
+            if uri[1]:
+                self.env.log.debug("Milestone: %s" % uri[1])
+                cursor = self.db.cursor()
+                sql = "select name from milestone where (name = '%s')" % uri[1]
+                cursor.execute(sql)
+                for name in cursor:
+                    self.currentMilestone = uri[1]
+
+        except IndexError:
+            pass
+        
+        #if req.args.get('milestone'):
+        #    cursor = self.db.cursor()
+        #    sql = "select name from milestone where (name = '%s')" % req.args.get('milestone')
+        #    cursor.execute(sql)
+        #    for name in cursor:
+        #        self.currentMilestone = req.args.get('milestone')
 
         return serve
  
@@ -176,6 +198,8 @@ class TracSprints(Component):
 
     def process_request(self, req):
         data = {}
+        data['baseURL'] = self.baseURL
+        data['baseQueryURL'] = self.baseQueryURL
         if self.currentMilestone == False:
             data['milestones'] = self.get_milestones()
         else:
